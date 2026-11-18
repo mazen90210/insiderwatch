@@ -1,28 +1,48 @@
 import os
 import hmac
+import logging
 
 import psycopg
 import numpy as np
 
-from flask import Flask, jsonify, request
+from dotenv import load_dotenv
+from flask import Flask, jsonify, request, render_template
 from sklearn.ensemble import IsolationForest
 
-app = Flask(__name__)
+# Load environment variables
+load_dotenv(".env.local")
 
+app = Flask(__name__)
+logging.basicConfig(level=logging.INFO)
+
+
+# =====================================
+# DATABASE
+# =====================================
 
 def get_conn():
-    return psycopg.connect(os.environ["DATABASE_URL"])
+    database_url = os.environ.get("DATABASE_URL")
+
+    if not database_url:
+        raise RuntimeError("DATABASE_URL is missing")
+
+    return psycopg.connect(database_url)
 
 
 def authorized():
     key = os.environ.get("INGEST_API_KEY", "")
     sent = request.headers.get("X-API-Key", "")
+
     return bool(key) and hmac.compare_digest(key, sent)
 
 
+# =====================================
+# HOME
+# =====================================
+
 @app.route("/")
 def home():
-    return "InsiderWatch is running"
+    return render_template("index.html")
 
 
 @app.route("/health")
@@ -30,8 +50,13 @@ def health():
     return jsonify(status="ok")
 
 
+# =====================================
+# INITIALIZE DATABASE
+# =====================================
+
 @app.route("/api/init", methods=["POST"])
 def init_db():
+
     if not authorized():
         return jsonify(error="unauthorized"), 401
 
@@ -50,44 +75,107 @@ def init_db():
     return jsonify(status="table ready")
 
 
+# =====================================
+# INGEST EVENTS
+# =====================================
+
 @app.route("/api/ingest", methods=["POST"])
 def ingest():
+
     if not authorized():
         return jsonify(error="unauthorized"), 401
 
     data = request.get_json(silent=True) or {}
     events = data.get("events", [])
 
+    if not isinstance(events, list):
+        return jsonify(error="events must be a list"), 400
+
     with get_conn() as conn:
-        for e in events:
-            conn.execute(
-                """
-                INSERT INTO events (host, username, event_type, message)
+
+        for event in events:
+
+            conn.execute("""
+                INSERT INTO events
+                (host, username, event_type, message)
                 VALUES (%s, %s, %s, %s)
-                """,
-                (
-                    e.get("host"),
-                    e.get("user"),
-                    e.get("type"),
-                    e.get("message")
-                )
-            )
+            """, (
+                event.get("host"),
+                event.get("user"),
+                event.get("type"),
+                event.get("message")
+            ))
 
     return jsonify(inserted=len(events))
 
 
+# =====================================
+# STATISTICS
+# =====================================
+
 @app.route("/api/stats")
 def stats():
+
     with get_conn() as conn:
-        rows = conn.execute(
-            """
+
+        rows = conn.execute("""
             SELECT event_type, COUNT(*)
             FROM events
             GROUP BY event_type
-            """
-        ).fetchall()
+        """).fetchall()
 
-    return jsonify({r[0]: r[1] for r in rows})
+        total = conn.execute("""
+            SELECT COUNT(*) FROM events
+        """).fetchone()[0]
+
+        failed = conn.execute("""
+            SELECT COUNT(*) FROM events
+            WHERE event_type = 'failed_login'
+        """).fetchone()[0]
+
+    result = {
+        "total_events": total,
+        "failed_login": failed
+    }
+
+    result.update({
+        row[0]: row[1]
+        for row in rows
+    })
+
+    return jsonify(result)
+
+
+# =====================================
+# RECENT SECURITY EVENTS
+# =====================================
+
+@app.route("/api/events")
+def recent_events():
+
+    with get_conn() as conn:
+
+        rows = conn.execute("""
+            SELECT id, ts, host, username, event_type, message
+            FROM events
+            ORDER BY ts DESC
+            LIMIT 20
+        """).fetchall()
+
+    events = []
+
+    for row in rows:
+
+        events.append({
+            "id": row[0],
+            "ts": row[1].isoformat() if row[1] else None,
+            "host": row[2],
+            "username": row[3],
+            "event_type": row[4],
+            "message": row[5]
+        })
+
+    return jsonify({"events": events})
 
 
 # =====================================
@@ -98,6 +186,7 @@ def stats():
 def ai_analyze():
 
     with get_conn() as conn:
+
         rows = conn.execute("""
             SELECT
                 host,
@@ -105,27 +194,27 @@ def ai_analyze():
 
                 COUNT(*) FILTER (
                     WHERE event_type = 'failed_login'
-                ) AS failed_login,
+                ),
 
                 COUNT(*) FILTER (
                     WHERE event_type = 'successful_login'
-                ) AS successful_login,
+                ),
 
                 COUNT(*) FILTER (
                     WHERE event_type = 'sudo_activity'
-                ) AS sudo_activity,
+                ),
 
                 COUNT(*) FILTER (
                     WHERE event_type = 'privileged_activity'
-                ) AS privileged_activity,
+                ),
 
                 COUNT(*) FILTER (
                     WHERE event_type = 'user_created'
-                ) AS user_created,
+                ),
 
                 COUNT(*) FILTER (
                     WHERE event_type = 'user_deleted'
-                ) AS user_deleted
+                )
 
             FROM events
 
@@ -136,9 +225,13 @@ def ai_analyze():
         """).fetchall()
 
     if not rows:
+
         return jsonify({
             "status": "no_data",
-            "message": "No events available for AI analysis"
+            "model": "Isolation Forest",
+            "model_trained": False,
+            "profiles_analyzed": 0,
+            "results": []
         })
 
     profiles = []
@@ -168,9 +261,10 @@ def ai_analyze():
         for p in profiles
     ])
 
-    # Train Isolation Forest when enough profiles exist
-
     model_available = len(profiles) >= 5
+
+    predictions = [1] * len(profiles)
+    anomaly_scores = [None] * len(profiles)
 
     if model_available:
 
@@ -189,8 +283,6 @@ def ai_analyze():
 
     for index, profile in enumerate(profiles):
 
-        # Rule-based risk score
-
         risk = 0
 
         risk += min(profile["failed_login"] * 8, 40)
@@ -202,11 +294,10 @@ def ai_analyze():
         is_anomaly = False
         anomaly_score = None
 
-        # Isolation Forest result
-
         if model_available:
 
             is_anomaly = predictions[index] == -1
+
             anomaly_score = round(
                 float(anomaly_scores[index]), 4
             )
@@ -215,8 +306,6 @@ def ai_analyze():
                 risk += 20
 
         risk = min(risk, 100)
-
-        # Threat classification
 
         if risk >= 80:
             threat_level = "Critical"
@@ -241,7 +330,7 @@ def ai_analyze():
         })
 
     results.sort(
-        key=lambda x: x["risk_score"],
+        key=lambda item: item["risk_score"],
         reverse=True
     )
 
@@ -253,6 +342,30 @@ def ai_analyze():
         "results": results
     })
 
+
+# =====================================
+# ERROR HANDLING
+# =====================================
+
+@app.errorhandler(Exception)
+def handle_error(error):
+
+    app.logger.exception("Application error")
+
+    if isinstance(error, psycopg.Error):
+        return jsonify({
+            "error": "Database error",
+            "message": "Could not complete database operation"
+        }), 500
+
+    return jsonify({
+        "error": "Internal server error"
+    }), 500
+
+
+# =====================================
+# RUN APPLICATION
+# =====================================
 
 if __name__ == "__main__":
     app.run(debug=True)

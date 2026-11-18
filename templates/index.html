@@ -1,0 +1,122 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InsiderWatch | Security Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="layout">
+    <aside class="sidebar">
+        <div class="brand"><span class="brand-icon">◈</span> InsiderWatch</div>
+        <div class="nav-label">MAIN MENU</div>
+        <a class="nav-item active" href="/">▦ &nbsp; Dashboard</a>
+        <a class="nav-item" href="#threats">◉ &nbsp; Threat Detection</a>
+        <a class="nav-item" href="#events">▤ &nbsp; Security Events</a>
+        <div class="sidebar-bottom">
+            <div class="system-status"><span class="pulse"></span> System Online</div>
+            <small>InsiderWatch v1.0</small>
+        </div>
+    </aside>
+
+    <main class="main">
+        <header class="topbar">
+            <div>
+                <div class="eyebrow">SECURITY OPERATIONS CENTER</div>
+                <h1>Dashboard</h1>
+                <p class="subtitle">Monitor system activity and detect insider threats.</p>
+            </div>
+            <div class="top-right">
+                <span class="live"><span class="pulse"></span> LIVE MONITORING</span>
+                <button class="refresh-btn" onclick="loadDashboard()">↻ Refresh</button>
+            </div>
+        </header>
+
+        <section class="section-heading">
+            <h2>Security Overview</h2>
+            <span class="muted" id="last-updated">Loading...</span>
+        </section>
+
+        <section class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-top"><span>Total Events</span><span class="stat-icon blue">▤</span></div>
+                <div class="stat-value" id="total-events">—</div>
+                <div class="stat-note">Collected security events</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-top"><span>Failed Logins</span><span class="stat-icon red">⚠</span></div>
+                <div class="stat-value" id="failed-logins">—</div>
+                <div class="stat-note">Failed authentication attempts</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-top"><span>AI Anomalies</span><span class="stat-icon purple">◉</span></div>
+                <div class="stat-value" id="anomalies">—</div>
+                <div class="stat-note">Unusual behavior detected</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-top"><span>Profiles Analyzed</span><span class="stat-icon green">♙</span></div>
+                <div class="stat-value" id="profiles">—</div>
+                <div class="stat-note">User and host profiles</div>
+            </div>
+        </section>
+
+        <section class="content-grid">
+            <div class="panel">
+                <div class="panel-header">
+                    <div><h3>Security Activity</h3><p>Events collected by type</p></div>
+                    <span class="tag">ALL TIME</span>
+                </div>
+                <div class="chart-wrap"><canvas id="activityChart"></canvas></div>
+            </div>
+
+            <div class="panel" id="threats">
+                <div class="panel-header">
+                    <div><h3>Threat Distribution</h3><p>AI risk classification</p></div>
+                    <span class="tag purple-tag">AI ANALYSIS</span>
+                </div>
+                <div class="threat-list">
+                    <div class="threat-row"><span class="dot critical"></span> Critical <strong id="critical-count">0</strong></div>
+                    <div class="threat-row"><span class="dot high"></span> High <strong id="high-count">0</strong></div>
+                    <div class="threat-row"><span class="dot medium"></span> Medium <strong id="medium-count">0</strong></div>
+                    <div class="threat-row"><span class="dot low"></span> Low <strong id="low-count">0</strong></div>
+                </div>
+                <div class="ai-status" id="ai-status">Connecting to AI engine...</div>
+            </div>
+        </section>
+
+        <section class="panel table-panel">
+            <div class="panel-header">
+                <div><h3>Highest Risk Profiles</h3><p>Users ranked by AI risk score</p></div>
+                <span class="tag purple-tag">ISOLATION FOREST</span>
+            </div>
+            <div class="table-responsive">
+                <table>
+                    <thead><tr><th>HOST</th><th>USERNAME</th><th>RISK SCORE</th><th>THREAT LEVEL</th><th>ANOMALY</th></tr></thead>
+                    <tbody id="risk-table"><tr><td colspan="5" class="empty">Loading AI analysis...</td></tr></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="panel table-panel" id="events">
+            <div class="panel-header">
+                <div><h3>Recent Security Events</h3><p>Latest events received by InsiderWatch</p></div>
+                <span class="tag">LATEST 20</span>
+            </div>
+            <div class="table-responsive">
+                <table>
+                    <thead><tr><th>TIME</th><th>HOST</th><th>USERNAME</th><th>EVENT TYPE</th><th>MESSAGE</th></tr></thead>
+                    <tbody id="events-table"><tr><td colspan="5" class="empty">Loading events...</td></tr></tbody>
+                </table>
+            </div>
+        </section>
+
+        <footer>InsiderWatch Security Monitoring System <span>Powered by Flask & Isolation Forest</span></footer>
+    </main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>
