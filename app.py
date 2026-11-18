@@ -1,6 +1,5 @@
 import os
 import hmac
-import logging
 
 import psycopg
 import numpy as np
@@ -9,16 +8,15 @@ from dotenv import load_dotenv
 from flask import Flask, jsonify, request, render_template
 from sklearn.ensemble import IsolationForest
 
-# Load environment variables
-load_dotenv(".env.local")
+
+load_dotenv(".env.local", override=True)
 
 app = Flask(__name__)
-logging.basicConfig(level=logging.INFO)
 
 
-# =====================================
-# DATABASE
-# =====================================
+# ==============================
+# DATABASE CONNECTION
+# ==============================
 
 def get_conn():
     database_url = os.environ.get("DATABASE_URL")
@@ -29,6 +27,10 @@ def get_conn():
     return psycopg.connect(database_url)
 
 
+# ==============================
+# API AUTHENTICATION
+# ==============================
+
 def authorized():
     key = os.environ.get("INGEST_API_KEY", "")
     sent = request.headers.get("X-API-Key", "")
@@ -36,9 +38,9 @@ def authorized():
     return bool(key) and hmac.compare_digest(key, sent)
 
 
-# =====================================
-# HOME
-# =====================================
+# ==============================
+# HOME DASHBOARD
+# ==============================
 
 @app.route("/")
 def home():
@@ -50,9 +52,9 @@ def health():
     return jsonify(status="ok")
 
 
-# =====================================
-# INITIALIZE DATABASE
-# =====================================
+# ==============================
+# DATABASE INITIALIZATION
+# ==============================
 
 @app.route("/api/init", methods=["POST"])
 def init_db():
@@ -61,6 +63,7 @@ def init_db():
         return jsonify(error="unauthorized"), 401
 
     with get_conn() as conn:
+
         conn.execute("""
             CREATE TABLE IF NOT EXISTS events (
                 id SERIAL PRIMARY KEY,
@@ -75,9 +78,9 @@ def init_db():
     return jsonify(status="table ready")
 
 
-# =====================================
-# INGEST EVENTS
-# =====================================
+# ==============================
+# RECEIVE SECURITY EVENTS
+# ==============================
 
 @app.route("/api/ingest", methods=["POST"])
 def ingest():
@@ -86,6 +89,7 @@ def ingest():
         return jsonify(error="unauthorized"), 401
 
     data = request.get_json(silent=True) or {}
+
     events = data.get("events", [])
 
     if not isinstance(events, list):
@@ -109,9 +113,9 @@ def ingest():
     return jsonify(inserted=len(events))
 
 
-# =====================================
-# STATISTICS
-# =====================================
+# ==============================
+# STATISTICS API
+# ==============================
 
 @app.route("/api/stats")
 def stats():
@@ -129,7 +133,8 @@ def stats():
         """).fetchone()[0]
 
         failed = conn.execute("""
-            SELECT COUNT(*) FROM events
+            SELECT COUNT(*)
+            FROM events
             WHERE event_type = 'failed_login'
         """).fetchone()[0]
 
@@ -146,9 +151,9 @@ def stats():
     return jsonify(result)
 
 
-# =====================================
-# RECENT SECURITY EVENTS
-# =====================================
+# ==============================
+# RECENT EVENTS API
+# ==============================
 
 @app.route("/api/events")
 def recent_events():
@@ -178,9 +183,9 @@ def recent_events():
     return jsonify({"events": events})
 
 
-# =====================================
-# AI THREAT DETECTION
-# =====================================
+# ==============================
+# AI + RULE BASED ANALYSIS
+# ==============================
 
 @app.route("/api/ai/analyze")
 def ai_analyze():
@@ -234,22 +239,32 @@ def ai_analyze():
             "results": []
         })
 
+    # BUILD USER PROFILES
+
     profiles = []
 
     for row in rows:
 
         profiles.append({
+
             "host": row[0],
             "user": row[1],
+
             "failed_login": row[2],
             "successful_login": row[3],
+
             "sudo_activity": row[4],
             "privileged_activity": row[5],
+
             "user_created": row[6],
             "user_deleted": row[7]
+
         })
 
+    # AI FEATURES
+
     features = np.array([
+
         [
             p["failed_login"],
             p["successful_login"],
@@ -258,12 +273,17 @@ def ai_analyze():
             p["user_created"],
             p["user_deleted"]
         ]
+
         for p in profiles
+
     ])
+
+    # TRAIN ISOLATION FOREST
 
     model_available = len(profiles) >= 5
 
     predictions = [1] * len(profiles)
+
     anomaly_scores = [None] * len(profiles)
 
     if model_available:
@@ -277,7 +297,10 @@ def ai_analyze():
         model.fit(features)
 
         predictions = model.predict(features)
+
         anomaly_scores = model.decision_function(features)
+
+    # RISK ANALYSIS
 
     results = []
 
@@ -285,13 +308,65 @@ def ai_analyze():
 
         risk = 0
 
-        risk += min(profile["failed_login"] * 8, 40)
-        risk += min(profile["sudo_activity"] * 5, 20)
-        risk += min(profile["privileged_activity"] * 5, 20)
-        risk += min(profile["user_created"] * 10, 10)
-        risk += min(profile["user_deleted"] * 10, 10)
+        failed = profile["failed_login"]
+
+        # RULE-BASED FAILED LOGIN DETECTION
+
+        if failed >= 8:
+
+            risk += 85
+            rule_triggered = True
+            rule_reason = "Critical number of failed login attempts"
+
+        elif failed >= 5:
+
+            risk += 65
+            rule_triggered = True
+            rule_reason = "High number of failed login attempts"
+
+        elif failed >= 3:
+
+            risk += 40
+            rule_triggered = True
+            rule_reason = "Multiple failed login attempts"
+
+        elif failed >= 1:
+
+            risk += 16
+            rule_triggered = False
+            rule_reason = "Small number of failed login attempts"
+
+        else:
+
+            rule_triggered = False
+            rule_reason = "No failed login attempts"
+
+        # OTHER SECURITY ACTIVITIES
+
+        risk += min(
+            profile["sudo_activity"] * 5,
+            20
+        )
+
+        risk += min(
+            profile["privileged_activity"] * 5,
+            20
+        )
+
+        risk += min(
+            profile["user_created"] * 10,
+            10
+        )
+
+        risk += min(
+            profile["user_deleted"] * 10,
+            10
+        )
+
+        # AI ANOMALY DETECTION
 
         is_anomaly = False
+
         anomaly_score = None
 
         if model_available:
@@ -299,35 +374,59 @@ def ai_analyze():
             is_anomaly = predictions[index] == -1
 
             anomaly_score = round(
-                float(anomaly_scores[index]), 4
+                float(anomaly_scores[index]),
+                4
             )
 
             if is_anomaly:
+
                 risk += 20
+
+        # FINAL RISK SCORE
 
         risk = min(risk, 100)
 
+        # THREAT CLASSIFICATION
+
         if risk >= 80:
+
             threat_level = "Critical"
 
         elif risk >= 60:
+
             threat_level = "High"
 
         elif risk >= 30:
+
             threat_level = "Medium"
 
         else:
+
             threat_level = "Low"
 
         results.append({
+
             "host": profile["host"],
+
             "username": profile["user"],
+
             "risk_score": risk,
+
             "threat_level": threat_level,
+
             "is_anomaly": bool(is_anomaly),
+
             "anomaly_score": anomaly_score,
+
+            "rule_triggered": rule_triggered,
+
+            "rule_reason": rule_reason,
+
             "activity": profile
+
         })
+
+    # SORT BY RISK SCORE
 
     results.sort(
         key=lambda item: item["risk_score"],
@@ -335,37 +434,24 @@ def ai_analyze():
     )
 
     return jsonify({
+
         "status": "success",
+
         "model": "Isolation Forest",
+
         "model_trained": model_available,
+
         "profiles_analyzed": len(profiles),
+
         "results": results
+
     })
 
 
-# =====================================
-# ERROR HANDLING
-# =====================================
-
-@app.errorhandler(Exception)
-def handle_error(error):
-
-    app.logger.exception("Application error")
-
-    if isinstance(error, psycopg.Error):
-        return jsonify({
-            "error": "Database error",
-            "message": "Could not complete database operation"
-        }), 500
-
-    return jsonify({
-        "error": "Internal server error"
-    }), 500
-
-
-# =====================================
-# RUN APPLICATION
-# =====================================
+# ==============================
+# APPLICATION START
+# ==============================
 
 if __name__ == "__main__":
+
     app.run(debug=True)
