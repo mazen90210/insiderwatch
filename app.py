@@ -235,7 +235,7 @@ def ai_analyze():
             "username": profile["user"],
             "risk_score": risk,
             "threat_level": threat_level,
-            "is_anomaly": is_anomaly,
+            "is_anomaly": bool(is_anomaly),
             "anomaly_score": anomaly_score,
             "activity": profile
         })
