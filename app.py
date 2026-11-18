@@ -19,6 +19,7 @@ app = Flask(__name__)
 # ==============================
 
 def get_conn():
+
     database_url = os.environ.get("DATABASE_URL")
 
     if not database_url:
@@ -28,11 +29,43 @@ def get_conn():
 
 
 # ==============================
+# USERNAME CLEANING
+# ==============================
+
+def clean_username(username):
+
+    if not username:
+        return "unknown"
+
+    username = str(username).strip()
+
+    username = username.strip(
+        "'\",;:()[]{} "
+    )
+
+    return username or "unknown"
+
+
+# ==============================
+# MACHINE ACCOUNT DETECTION
+# ==============================
+
+def is_machine_account(username):
+
+    if not username:
+        return False
+
+    return username.endswith("$")
+
+
+# ==============================
 # API AUTHENTICATION
 # ==============================
 
 def authorized():
+
     key = os.environ.get("INGEST_API_KEY", "")
+
     sent = request.headers.get("X-API-Key", "")
 
     return bool(key) and hmac.compare_digest(key, sent)
@@ -44,11 +77,13 @@ def authorized():
 
 @app.route("/")
 def home():
+
     return render_template("index.html")
 
 
 @app.route("/health")
 def health():
+
     return jsonify(status="ok")
 
 
@@ -60,6 +95,7 @@ def health():
 def init_db():
 
     if not authorized():
+
         return jsonify(error="unauthorized"), 401
 
     with get_conn() as conn:
@@ -86,6 +122,7 @@ def init_db():
 def ingest():
 
     if not authorized():
+
         return jsonify(error="unauthorized"), 401
 
     data = request.get_json(silent=True) or {}
@@ -93,11 +130,21 @@ def ingest():
     events = data.get("events", [])
 
     if not isinstance(events, list):
+
         return jsonify(error="events must be a list"), 400
+
+    inserted = 0
 
     with get_conn() as conn:
 
         for event in events:
+
+            if not isinstance(event, dict):
+                continue
+
+            username = clean_username(
+                event.get("user")
+            )
 
             conn.execute("""
                 INSERT INTO events
@@ -105,12 +152,14 @@ def ingest():
                 VALUES (%s, %s, %s, %s)
             """, (
                 event.get("host"),
-                event.get("user"),
+                username,
                 event.get("type"),
                 event.get("message")
             ))
 
-    return jsonify(inserted=len(events))
+            inserted += 1
+
+    return jsonify(inserted=inserted)
 
 
 # ==============================
@@ -139,13 +188,19 @@ def stats():
         """).fetchone()[0]
 
     result = {
+
         "total_events": total,
+
         "failed_login": failed
+
     }
 
     result.update({
+
         row[0]: row[1]
+
         for row in rows
+
     })
 
     return jsonify(result)
@@ -172,12 +227,19 @@ def recent_events():
     for row in rows:
 
         events.append({
+
             "id": row[0],
+
             "ts": row[1].isoformat() if row[1] else None,
+
             "host": row[2],
+
             "username": row[3],
+
             "event_type": row[4],
+
             "message": row[5]
+
         })
 
     return jsonify({"events": events})
@@ -232,14 +294,22 @@ def ai_analyze():
     if not rows:
 
         return jsonify({
+
             "status": "no_data",
+
             "model": "Isolation Forest",
+
             "model_trained": False,
+
             "profiles_analyzed": 0,
+
             "results": []
+
         })
 
+    # ==============================
     # BUILD USER PROFILES
+    # ==============================
 
     profiles = []
 
@@ -248,39 +318,77 @@ def ai_analyze():
         profiles.append({
 
             "host": row[0],
-            "user": row[1],
+
+            "user": clean_username(row[1]),
 
             "failed_login": row[2],
+
             "successful_login": row[3],
 
             "sudo_activity": row[4],
+
             "privileged_activity": row[5],
 
             "user_created": row[6],
+
             "user_deleted": row[7]
 
         })
 
+    # ==============================
+    # PREPARE AI PROFILES
+    # EXCLUDE MACHINE ACCOUNTS
+    # ==============================
+
+    ai_indices = [
+
+        index
+
+        for index, profile in enumerate(profiles)
+
+        if not is_machine_account(profile["user"])
+
+    ]
+
+    ai_profiles = [
+
+        profiles[index]
+
+        for index in ai_indices
+
+    ]
+
+    # ==============================
     # AI FEATURES
+    # ==============================
 
     features = np.array([
 
         [
+
             p["failed_login"],
+
             p["successful_login"],
+
             p["sudo_activity"],
+
             p["privileged_activity"],
+
             p["user_created"],
+
             p["user_deleted"]
+
         ]
 
-        for p in profiles
+        for p in ai_profiles
 
     ])
 
+    # ==============================
     # TRAIN ISOLATION FOREST
+    # ==============================
 
-    model_available = len(profiles) >= 5
+    model_available = len(ai_profiles) >= 5
 
     predictions = [1] * len(profiles)
 
@@ -289,18 +397,30 @@ def ai_analyze():
     if model_available:
 
         model = IsolationForest(
-            n_estimators=100,
+
+            n_estimators=150,
+
             contamination="auto",
+
             random_state=42
+
         )
 
         model.fit(features)
 
-        predictions = model.predict(features)
+        ai_predictions = model.predict(features)
 
-        anomaly_scores = model.decision_function(features)
+        ai_scores = model.decision_function(features)
 
+        for position, original_index in enumerate(ai_indices):
+
+            predictions[original_index] = ai_predictions[position]
+
+            anomaly_scores[original_index] = ai_scores[position]
+
+    # ==============================
     # RISK ANALYSIS
+    # ==============================
 
     results = []
 
@@ -310,38 +430,51 @@ def ai_analyze():
 
         failed = profile["failed_login"]
 
-        # RULE-BASED FAILED LOGIN DETECTION
+        # ==============================
+        # FAILED LOGIN DETECTION
+        # ==============================
 
         if failed >= 8:
 
             risk += 85
+
             rule_triggered = True
+
             rule_reason = "Critical number of failed login attempts"
 
         elif failed >= 5:
 
             risk += 65
+
             rule_triggered = True
+
             rule_reason = "High number of failed login attempts"
 
         elif failed >= 3:
 
             risk += 40
+
             rule_triggered = True
+
             rule_reason = "Multiple failed login attempts"
 
         elif failed >= 1:
 
             risk += 16
+
             rule_triggered = False
+
             rule_reason = "Small number of failed login attempts"
 
         else:
 
             rule_triggered = False
+
             rule_reason = "No failed login attempts"
 
+        # ==============================
         # OTHER SECURITY ACTIVITIES
+        # ==============================
 
         risk += min(
             profile["sudo_activity"] * 5,
@@ -363,30 +496,45 @@ def ai_analyze():
             10
         )
 
+        # ==============================
         # AI ANOMALY DETECTION
+        # ==============================
+
+        machine_account = is_machine_account(
+            profile["user"]
+        )
 
         is_anomaly = False
 
         anomaly_score = None
 
-        if model_available:
+        if model_available and not machine_account:
 
-            is_anomaly = predictions[index] == -1
+            score = float(anomaly_scores[index])
 
-            anomaly_score = round(
-                float(anomaly_scores[index]),
-                4
+            anomaly_score = round(score, 4)
+
+            is_anomaly = (
+
+                predictions[index] == -1
+
+                and score < -0.08
+
             )
 
             if is_anomaly:
 
                 risk += 20
 
+        # ==============================
         # FINAL RISK SCORE
+        # ==============================
 
         risk = min(risk, 100)
 
+        # ==============================
         # THREAT CLASSIFICATION
+        # ==============================
 
         if risk >= 80:
 
@@ -403,6 +551,10 @@ def ai_analyze():
         else:
 
             threat_level = "Low"
+
+        # ==============================
+        # RESULT
+        # ==============================
 
         results.append({
 
@@ -426,11 +578,16 @@ def ai_analyze():
 
         })
 
+    # ==============================
     # SORT BY RISK SCORE
+    # ==============================
 
     results.sort(
+
         key=lambda item: item["risk_score"],
+
         reverse=True
+
     )
 
     return jsonify({
@@ -442,6 +599,8 @@ def ai_analyze():
         "model_trained": model_available,
 
         "profiles_analyzed": len(profiles),
+
+        "ai_profiles_analyzed": len(ai_profiles),
 
         "results": results
 
