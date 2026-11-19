@@ -40,9 +40,11 @@ function renderEvents(events){
 }
 
 function renderChart(stats){
-    const labels=Object.keys(stats);
-    const values=Object.values(stats);
+    const labels=Object.keys(stats).filter(key=>key!=="total_events");
+    const values=labels.map(key=>Number(stats[key]||0));
+
     if(activityChart) activityChart.destroy();
+
     activityChart=new Chart(document.getElementById("activityChart"),{
         type:"bar",
         data:{labels,datasets:[{label:"Events",data:values,backgroundColor:"#6688ff",borderRadius:5,maxBarThickness:38}]},
@@ -60,27 +62,45 @@ async function loadDashboard(){
             fetch("/api/ai/analyze"),
             fetch("/api/events")
         ]);
-        if(!statsResponse.ok || !aiResponse.ok || !eventsResponse.ok) throw new Error("API request failed");
+
+        if(!statsResponse.ok || !aiResponse.ok || !eventsResponse.ok)
+            throw new Error("API request failed");
+
         const stats=await statsResponse.json();
         const ai=await aiResponse.json();
         const events=await eventsResponse.json();
 
-        const total=Object.values(stats).reduce((a,b)=>a+Number(b),0);
+        // Use the actual total from the API instead of summing all statistics.
+        const total=Number(stats.total_events||0);
+
         setText("total-events",number(total));
         setText("failed-logins",number(stats.failed_login));
         setText("profiles",number(ai.profiles_analyzed));
 
         const results=ai.results||[];
+
         setText("anomalies",number(results.filter(x=>x.is_anomaly).length));
+
         ["Critical","High","Medium","Low"].forEach(level=>{
-            setText(level.toLowerCase()+"-count",number(results.filter(x=>x.threat_level===level).length));
+            setText(
+                level.toLowerCase()+"-count",
+                number(results.filter(x=>x.threat_level===level).length)
+            );
         });
 
-        setText("ai-status",ai.model_trained?"AI ENGINE ONLINE · ISOLATION FOREST TRAINED":"AI ENGINE ONLINE · RULE-BASED MODE");
+        setText(
+            "ai-status",
+            ai.model_trained
+                ?"AI ENGINE ONLINE · ISOLATION FOREST TRAINED"
+                :"AI ENGINE ONLINE · RULE-BASED MODE"
+        );
+
         renderRisk(results);
         renderEvents(events.events||[]);
         renderChart(stats);
+
         setText("last-updated","Last updated: "+new Date().toLocaleTimeString());
+
     }catch(error){
         setText("ai-status","Unable to load dashboard data. Check API connection.");
         console.error(error);
