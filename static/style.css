@@ -56,3 +56,215 @@ tbody tr:hover{background:#172239}
 footer{display:flex;justify-content:space-between;color:#62718b;font-size:10px;padding:8px 2px 20px}
 @media(max-width:1000px){.sidebar{width:190px}.main{margin-left:190px;width:calc(100% - 190px);padding:25px}.stats-grid{grid-template-columns:repeat(2,1fr)}.content-grid{grid-template-columns:1fr}}
 @media(max-width:650px){.sidebar{display:none}.main{margin:0;width:100%;padding:20px 14px}.topbar{align-items:flex-start;gap:15px;flex-direction:column}.top-right{flex-wrap:wrap}.stats-grid{gap:9px}.stat-card{padding:13px}.stat-value{font-size:24px}footer{gap:10px;flex-direction:column}}
+
+/* ==========================================
+   RESPONSE CENTER - STATUS BADGES
+========================================== */
+
+.response-status {
+    display: inline-block;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .5px;
+    text-transform: uppercase;
+}
+
+.response-pending {
+    background: #443c22;
+    color: #f4d77d;
+    border: 1px solid #79672e;
+}
+
+.response-running {
+    background: #1c3156;
+    color: #78a7ff;
+    border: 1px solid #35578c;
+}
+
+.response-completed {
+    background: #173b34;
+    color: #66dfb4;
+    border: 1px solid #286b59;
+}
+
+.response-failed {
+    background: #48232d;
+    color: #ff8394;
+    border: 1px solid #813b4b;
+}
+
+
+/* RESPONSE RESULT DETAILS */
+.response-result-details {
+    min-width: 190px;
+    line-height: 1.6;
+}
+
+.response-result-details strong {
+    display: inline-block;
+    color: #78a7ff;
+    font-size: 12px;
+    margin-bottom: 4px;
+}
+
+.response-result-details div {
+    color: #66dfb4;
+    font-size: 11px;
+    margin-bottom: 5px;
+}
+
+.response-result-details small {
+    display: inline-block;
+    color: #9aa9c2;
+    font-size: 10px;
+    margin-top: 3px;
+}
+
+
+/* RESPONSE ANALYTICS CARDS */
+.response-analytics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 15px;
+    margin: 20px 0 28px;
+}
+
+.response-analytics-card {
+    background: #111d32;
+    border: 1px solid #263956;
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    transition: transform .2s ease, border-color .2s ease;
+}
+
+.response-analytics-card:hover {
+    transform: translateY(-3px);
+    border-color: #78a7ff;
+}
+
+.response-analytics-card span {
+    color: #9aa9c2;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.response-analytics-card strong {
+    color: #78a7ff;
+    font-size: 28px;
+    font-weight: 800;
+}
+
+
+/* RESPONSE CENTER TEXT VISIBILITY */
+#response-center .text-muted {
+    color: #9aa9c2 !important;
+    opacity: 1;
+}
+
+
+/* RECENT SECURITY EVENTS - MESSAGE DISPLAY */
+
+.event-message-cell {
+    min-width: 280px;
+    max-width: 420px;
+    vertical-align: top;
+}
+
+.event-message-preview {
+    color: #c5d1e5;
+    font-size: 12px;
+    line-height: 1.6;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+}
+
+.event-message-details {
+    margin-top: 8px;
+}
+
+.event-message-details summary {
+    color: #78a7ff;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    width: fit-content;
+}
+
+.event-full-message {
+    margin-top: 10px;
+    padding: 12px;
+    background: #0b1628;
+    border: 1px solid #263956;
+    border-radius: 8px;
+    color: #c5d1e5;
+    font-size: 11px;
+    line-height: 1.7;
+    max-height: 220px;
+    overflow-y: auto;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+
+/* SECURITY EVENTS FILTER BAR */
+
+.events-filters {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 18px 20px;
+    flex-wrap: wrap;
+}
+
+.events-filters input,
+.events-filters select {
+    background: #111d32;
+    color: #e2eaf7;
+    border: 1px solid #263956;
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 13px;
+    outline: none;
+    min-height: 44px;
+}
+
+.events-filters input {
+    flex: 1;
+    min-width: 240px;
+}
+
+.events-filters select {
+    min-width: 200px;
+}
+
+.events-filters input:focus,
+.events-filters select:focus {
+    border-color: #78a7ff;
+    box-shadow: 0 0 0 2px rgba(120, 167, 255, 0.12);
+}
+
+.events-filters input::placeholder {
+    color: #8494ad;
+}
+
+.events-filters select option {
+    background: #111d32;
+    color: #e2eaf7;
+}
+
+@media (max-width: 600px) {
+    .events-filters input,
+    .events-filters select,
+    .events-filters button {
+        width: 100%;
+    }
+}
+

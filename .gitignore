@@ -1,3 +1,13 @@
 .venv/
 .vercel
 .env*
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Local backups and review files
+*_before_*
+app_backup.py
+review_source.txt
+tatus --short

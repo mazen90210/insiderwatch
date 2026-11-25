@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -12,10 +12,15 @@
 <div class="layout">
     <aside class="sidebar">
         <div class="brand"><span class="brand-icon">◈</span> InsiderWatch</div>
+
         <div class="nav-label">MAIN MENU</div>
+
         <a class="nav-item active" href="/">▦ &nbsp; Dashboard</a>
         <a class="nav-item" href="#threats">◉ &nbsp; Threat Detection</a>
         <a class="nav-item" href="#events">▤ &nbsp; Security Events</a>
+        <a class="nav-item" href="#incidents">⚑ &nbsp; Incident Management</a>
+        <a class="nav-item" href="#response-center">⚡ &nbsp; Response Center</a>
+
         <div class="sidebar-bottom">
             <div class="system-status"><span class="pulse"></span> System Online</div>
             <small>InsiderWatch v1.0</small>
@@ -29,6 +34,7 @@
                 <h1>Dashboard</h1>
                 <p class="subtitle">Monitor system activity and detect insider threats.</p>
             </div>
+
             <div class="top-right">
                 <span class="live"><span class="pulse"></span> LIVE MONITORING</span>
                 <button class="refresh-btn" onclick="loadDashboard()">↻ Refresh</button>
@@ -40,83 +46,539 @@
             <span class="muted" id="last-updated">Loading...</span>
         </section>
 
+        <!-- STATISTICS -->
         <section class="stats-grid">
             <div class="stat-card">
-                <div class="stat-top"><span>Total Events</span><span class="stat-icon blue">▤</span></div>
+                <div class="stat-top">
+                    <span>Total Events</span>
+                    <span class="stat-icon blue">▤</span>
+                </div>
                 <div class="stat-value" id="total-events">—</div>
                 <div class="stat-note">Collected security events</div>
             </div>
+
             <div class="stat-card">
-                <div class="stat-top"><span>Failed Logins</span><span class="stat-icon red">⚠</span></div>
+                <div class="stat-top">
+                    <span>Failed Logins</span>
+                    <span class="stat-icon red">⚠</span>
+                </div>
                 <div class="stat-value" id="failed-logins">—</div>
                 <div class="stat-note">Failed authentication attempts</div>
             </div>
+
             <div class="stat-card">
-                <div class="stat-top"><span>AI Anomalies</span><span class="stat-icon purple">◉</span></div>
+                <div class="stat-top">
+                    <span>AI Anomalies</span>
+                    <span class="stat-icon purple">◉</span>
+                </div>
                 <div class="stat-value" id="anomalies">—</div>
                 <div class="stat-note">Unusual behavior detected</div>
             </div>
+
             <div class="stat-card">
-                <div class="stat-top"><span>Profiles Analyzed</span><span class="stat-icon green">♙</span></div>
+                <div class="stat-top">
+                    <span>Profiles Analyzed</span>
+                    <span class="stat-icon green">♙</span>
+                </div>
                 <div class="stat-value" id="profiles">—</div>
                 <div class="stat-note">User and host profiles</div>
             </div>
         </section>
 
+        <!-- SECURITY ACTIVITY AND THREATS -->
         <section class="content-grid">
             <div class="panel">
                 <div class="panel-header">
-                    <div><h3>Security Activity</h3><p>Events collected by type</p></div>
+                    <div>
+                        <h3>Security Activity</h3>
+                        <p>Events collected by type</p>
+                    </div>
                     <span class="tag">ALL TIME</span>
                 </div>
-                <div class="chart-wrap"><canvas id="activityChart"></canvas></div>
+
+                <div class="chart-wrap">
+                    <canvas id="activityChart"></canvas>
+                </div>
             </div>
 
             <div class="panel" id="threats">
                 <div class="panel-header">
-                    <div><h3>Threat Distribution</h3><p>AI risk classification</p></div>
+                    <div>
+                        <h3>Threat Distribution</h3>
+                        <p>AI risk classification</p>
+                    </div>
                     <span class="tag purple-tag">AI ANALYSIS</span>
                 </div>
+
                 <div class="threat-list">
-                    <div class="threat-row"><span class="dot critical"></span> Critical <strong id="critical-count">0</strong></div>
-                    <div class="threat-row"><span class="dot high"></span> High <strong id="high-count">0</strong></div>
-                    <div class="threat-row"><span class="dot medium"></span> Medium <strong id="medium-count">0</strong></div>
-                    <div class="threat-row"><span class="dot low"></span> Low <strong id="low-count">0</strong></div>
+                    <div class="threat-row">
+                        <span class="dot critical"></span>
+                        Critical
+                        <strong id="critical-count">0</strong>
+                    </div>
+
+                    <div class="threat-row">
+                        <span class="dot high"></span>
+                        High
+                        <strong id="high-count">0</strong>
+                    </div>
+
+                    <div class="threat-row">
+                        <span class="dot medium"></span>
+                        Medium
+                        <strong id="medium-count">0</strong>
+                    </div>
+
+                    <div class="threat-row">
+                        <span class="dot low"></span>
+                        Low
+                        <strong id="low-count">0</strong>
+                    </div>
                 </div>
-                <div class="ai-status" id="ai-status">Connecting to AI engine...</div>
+
+                <div class="ai-status" id="ai-status">
+                    Connecting to AI engine...
+                </div>
             </div>
         </section>
 
+        <!-- HIGHEST RISK PROFILES -->
         <section class="panel table-panel">
             <div class="panel-header">
-                <div><h3>Highest Risk Profiles</h3><p>Users ranked by AI risk score</p></div>
+                <div>
+                    <h3>Highest Risk Profiles</h3>
+                    <p>Users ranked by AI risk score</p>
+                </div>
                 <span class="tag purple-tag">ISOLATION FOREST</span>
             </div>
+
             <div class="table-responsive">
                 <table>
-                    <thead><tr><th>HOST</th><th>USERNAME</th><th>RISK SCORE</th><th>THREAT LEVEL</th><th>ANOMALY</th></tr></thead>
-                    <tbody id="risk-table"><tr><td colspan="5" class="empty">Loading AI analysis...</td></tr></tbody>
+                    <thead>
+                        <tr>
+                            <th>HOST</th>
+                            <th>USERNAME</th>
+                            <th>RISK SCORE</th>
+                            <th>THREAT LEVEL</th>
+                            <th>ANOMALY</th>
+                        </tr>
+                    </thead>
+
+                    <tbody id="risk-table">
+                        <tr>
+                            <td colspan="5" class="empty">Loading AI analysis...</td>
+                        </tr>
+                    </tbody>
                 </table>
             </div>
         </section>
 
+        <!-- SECURITY EVENTS -->
         <section class="panel table-panel" id="events">
             <div class="panel-header">
-                <div><h3>Recent Security Events</h3><p>Latest events received by InsiderWatch</p></div>
+                <div>
+                    <h3>Recent Security Events</h3>
+                    <p>Latest events received by InsiderWatch</p>
+                </div>
                 <span class="tag">LATEST 20</span>
             </div>
+
+            <div class="events-filters">
+                <input type="text"
+                       id="event-search"
+                       placeholder="Search host, username or message...">
+
+                <select id="event-type-filter">
+                    <option value="">All Event Types</option>
+                    <option value="successful_login">Successful Login</option>
+                    <option value="failed_login">Failed Login</option>
+                    <option value="privileged_activity">Privileged Activity</option>
+                    <option value="sudo_activity">Sudo Activity</option>
+                    <option value="user_created">User Created</option>
+                    <option value="user_deleted">User Deleted</option>
+                </select>
+
+                <button type="button"
+                        class="refresh-btn"
+                        onclick="resetEventFilters()">
+                    Reset Filters
+                </button>
+
+                <button type="button"
+                        class="refresh-btn"
+                        onclick="exportSecurityEvents()">
+                    Export CSV
+                </button>
+            </div>
+
             <div class="table-responsive">
                 <table>
-                    <thead><tr><th>TIME</th><th>HOST</th><th>USERNAME</th><th>EVENT TYPE</th><th>MESSAGE</th></tr></thead>
-                    <tbody id="events-table"><tr><td colspan="5" class="empty">Loading events...</td></tr></tbody>
+                    <thead>
+                        <tr>
+                            <th>TIME</th>
+                            <th>HOST</th>
+                            <th>USERNAME</th>
+                            <th>EVENT TYPE</th>
+                            <th>MESSAGE</th>
+                        </tr>
+                    </thead>
+
+                    <tbody id="events-table">
+                        <tr>
+                            <td colspan="5" class="empty">Loading events...</td>
+                        </tr>
+                    </tbody>
                 </table>
             </div>
         </section>
 
-        <footer>InsiderWatch Security Monitoring System <span>Powered by Flask & Isolation Forest</span></footer>
+        <!-- INCIDENT MANAGEMENT -->
+        <section class="panel table-panel" id="incidents">
+            <div class="panel-header">
+                <div>
+                    <h3>Incident Management</h3>
+                    <p>Track, investigate, and resolve security incidents</p>
+                </div>
+
+                <button class="refresh-btn" onclick="loadIncidents()">
+                    ↻ Refresh Incidents
+                </button>
+            </div>
+
+            <div class="p-3">
+                <h4>Create New Incident</h4>
+
+                <form id="incident-form">
+                    <div class="row g-3">
+
+                        <div class="col-md-6">
+                            <label class="form-label">Incident Title</label>
+                            <input type="text"
+                                   class="form-control"
+                                   id="incident-title"
+                                   placeholder="e.g. Repeated Failed Login Attempts"
+                                   required>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label">Severity</label>
+                            <select class="form-select" id="incident-severity">
+                                <option>Low</option>
+                                <option selected>Medium</option>
+                                <option>High</option>
+                                <option>Critical</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label">Risk Score</label>
+                            <input type="number"
+                                   class="form-control"
+                                   id="incident-risk"
+                                   min="0"
+                                   max="100"
+                                   value="50"
+                                   required>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Host</label>
+                            <input type="text"
+                                   class="form-control"
+                                   id="incident-host"
+                                   placeholder="e.g. DC01">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Username</label>
+                            <input type="text"
+                                   class="form-control"
+                                   id="incident-username"
+                                   placeholder="e.g. insiderwatch_test">
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label">Description</label>
+                            <textarea class="form-control"
+                                      id="incident-description"
+                                      rows="3"
+                                      placeholder="Describe the security incident..."></textarea>
+                        </div>
+
+                        <div class="col-12">
+                            <button type="submit" class="refresh-btn">
+                                + Create Incident
+                            </button>
+
+                            <span id="incident-form-message" class="ms-2"></span>
+                        </div>
+
+                    </div>
+                </form>
+            </div>
+
+            <hr>
+
+            <div class="p-3">
+                <h4>Security Incidents</h4>
+
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>TITLE</th>
+                                <th>HOST</th>
+                                <th>USERNAME</th>
+                                <th>SEVERITY</th>
+                                <th>RISK</th>
+                                <th>STATUS</th>
+                                <th>CREATED</th>
+                                <th>ACTION</th>
+                            </tr>
+                        </thead>
+
+                        <tbody id="incidents-table">
+                            <tr>
+                                <td colspan="9" class="empty">Loading incidents...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- INCIDENT DETAILS -->
+        <section class="panel table-panel"
+                 id="incident-details"
+                 style="display:none;">
+
+            <div class="panel-header">
+                <div>
+                    <h3>Incident Details</h3>
+                    <p id="incident-details-subtitle">
+                        Review and update incident status
+                    </p>
+                </div>
+
+                <button class="refresh-btn" onclick="closeIncidentDetails()">
+                    Close
+                </button>
+            </div>
+
+            <div class="p-3">
+                <div id="incident-details-content"></div>
+
+                <hr>
+
+                <h4>Update Incident</h4>
+
+                <form id="incident-update-form">
+                    <input type="hidden" id="selected-incident-id">
+
+                    <div class="mb-3">
+                        <label class="form-label">Status</label>
+
+                        <select class="form-select" id="incident-status">
+                            <option>Open</option>
+                            <option>Acknowledged</option>
+                            <option>Investigating</option>
+                            <option>False Positive</option>
+                            <option>Resolved</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Notes</label>
+
+                        <textarea class="form-control"
+                                  id="investigation-notes"
+                                  rows="4"
+                                  placeholder="Add investigation findings..."></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Resolution</label>
+
+                        <textarea class="form-control"
+                                  id="incident-resolution"
+                                  rows="2"
+                                  placeholder="Describe how the incident was resolved..."></textarea>
+                    </div>
+
+                    <button type="submit" class="refresh-btn">
+                        Save Changes
+                    </button>
+
+                    <span id="incident-update-message" class="ms-2"></span>
+                </form>
+
+                <hr>
+
+                <h4>Activity Log</h4>
+
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>TIME</th>
+                                <th>ACTOR</th>
+                                <th>ACTION</th>
+                                <th>DETAILS</th>
+                            </tr>
+                        </thead>
+
+                        <tbody id="incident-audit-table">
+                            <tr>
+                                <td colspan="4" class="empty">
+                                    Select an incident to view its activity log.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- RESPONSE CENTER -->
+        <section class="panel table-panel" id="response-center">
+
+            <div class="panel-header">
+                <div>
+                    <h3>Response Center</h3>
+                    <p>Request and monitor security response actions</p>
+                </div>
+
+                <button class="refresh-btn" onclick="loadResponseActions()">
+                    ↻ Refresh
+                </button>
+            </div>
+
+            <div class="p-3">
+
+                <!-- RESPONSE ANALYTICS -->
+                <div class="response-analytics-grid">
+
+                    <div class="response-analytics-card">
+                        <span>Total Actions</span>
+                        <strong id="response-total">0</strong>
+                    </div>
+
+                    <div class="response-analytics-card">
+                        <span>Completed</span>
+                        <strong id="response-completed">0</strong>
+                    </div>
+
+                    <div class="response-analytics-card">
+                        <span>Failed</span>
+                        <strong id="response-failed">0</strong>
+                    </div>
+
+                    <div class="response-analytics-card">
+                        <span>Pending / Running</span>
+                        <strong id="response-pending">0</strong>
+                    </div>
+
+                    <div class="response-analytics-card">
+                        <span>Events Collected</span>
+                        <strong id="response-events-collected">0</strong>
+                    </div>
+
+                </div>
+
+                <div class="response-chart-card">
+                    <h4>Response Actions Distribution</h4>
+                    <div style="height:280px; position:relative;">
+                        <canvas id="responseStatusChart"></canvas>
+                    </div>
+                </div>
+
+                <h4>Collect Windows Security Logs</h4>
+
+                <p class="text-muted">
+                    Request the Windows Agent to collect additional Security
+                    events from the selected incident's host.
+                </p>
+
+                <form id="response-action-form">
+
+                    <div class="mb-3">
+                        <label class="form-label">Incident ID</label>
+
+                        <input type="number"
+                               id="response-incident-id"
+                               class="form-control"
+                               min="1"
+                               placeholder="Enter Incident ID"
+                               required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Maximum Events</label>
+
+                        <input type="number"
+                               id="response-max-events"
+                               class="form-control"
+                               min="1"
+                               max="200"
+                               value="50"
+                               required>
+                    </div>
+
+                    <button type="submit" class="refresh-btn">
+                        ⚡ Request Log Collection
+                    </button>
+
+                    <span id="response-message" class="ms-2"></span>
+
+                </form>
+
+                <hr>
+
+                <h4>Response Action History</h4>
+
+                <p class="text-muted">
+                    View the status and results of previously requested actions.
+                </p>
+
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>INCIDENT</th>
+                                <th>ACTION</th>
+                                <th>STATUS</th>
+                                <th>EVENTS FOUND</th>
+                                <th>EVENTS UPLOADED</th>
+                                <th>RESULT</th>
+                                <th>CREATED</th>
+                            </tr>
+                        </thead>
+
+                        <tbody id="response-actions-table">
+                            <tr>
+                                <td colspan="8" class="empty">
+                                    Loading response actions...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
+        </section>
+
+        <footer>
+            InsiderWatch Security Monitoring System
+            <span>Powered by Mazen Yasser</span>
+        </footer>
+
     </main>
 </div>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="/static/app.js"></script>
+
 </body>
 </html>
