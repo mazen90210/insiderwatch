@@ -31,7 +31,7 @@ function escapeHTML(value) {
 }
 
 function formatDate(value) {
-    return value ? new Date(value).toLocaleString() : "—";
+    return value ? new Date(value).toLocaleString() : "-";
 }
 
 
@@ -238,17 +238,17 @@ function applyEventFilters() {
     body.innerHTML = filtered.map(event => `
         <tr>
             <td>${escapeHTML(formatDate(event.ts))}</td>
-            <td>${escapeHTML(event.host || "—")}</td>
-            <td>${escapeHTML(event.username || "—")}</td>
-            <td>${escapeHTML(event.event_type || "—")}</td>
+            <td>${escapeHTML(event.host || "-")}</td>
+            <td>${escapeHTML(event.username || "-")}</td>
+            <td>${escapeHTML(event.event_type || "-")}</td>
             <td class="event-message-cell">
                 <div class="event-message-preview">
-                    ${escapeHTML(event.message || "—")}
+                    ${escapeHTML(event.message || "-")}
                 </div>
                 <details class="event-message-details">
                     <summary>View Full Message</summary>
                     <div class="event-full-message">
-                        ${escapeHTML(event.message || "—")}
+                        ${escapeHTML(event.message || "-")}
                     </div>
                 </details>
             </td>
@@ -400,8 +400,8 @@ async function loadDashboard() {
         setText(
             "ai-status",
             ai.model_trained
-                ? "AI ENGINE ONLINE · ISOLATION FOREST TRAINED"
-                : "AI ENGINE ONLINE · RULE-BASED MODE"
+                ? "AI ENGINE ONLINE | ISOLATION FOREST TRAINED"
+                : "AI ENGINE ONLINE | RULE-BASED MODE"
         );
 
         renderRisk(results);
@@ -434,7 +434,6 @@ async function loadIncidents() {
     const body = document.getElementById("incidents-table");
 
     try {
-
         body.innerHTML =
             '<tr><td colspan="9" class="empty">Loading incidents...</td></tr>';
 
@@ -451,62 +450,233 @@ async function loadIncidents() {
             : (data.incidents || []);
 
         if (!incidents.length) {
-
             body.innerHTML =
                 '<tr><td colspan="9" class="empty">No incidents found</td></tr>';
-
             return;
         }
 
-        body.innerHTML = incidents.map(incident => `
+        body.innerHTML = incidents.map(incident => {
 
-            <tr>
+            const severity = String(incident.severity || "Low").toLowerCase();
+            const status = String(incident.status || "Open").toLowerCase();
+            const risk = Math.min(100, Math.max(0, Number(incident.risk_score) || 0));
 
-                <td>#${escapeHTML(incident.id)}</td>
+            const severityClass = {
+                low: "severity-low",
+                medium: "severity-medium",
+                high: "severity-high",
+                critical: "severity-critical"
+            }[severity] || "severity-low";
 
-                <td>${escapeHTML(incident.title)}</td>
+            const statusClass = {
+                open: "status-open",
+                investigating: "status-investigating",
+                resolved: "status-resolved",
+                closed: "status-closed"
+            }[status] || "status-open";
 
-                <td>${escapeHTML(incident.host || "—")}</td>
+            const riskColor =
+                risk >= 75 ? "#ff536b" :
+                risk >= 40 ? "#f2cb60" :
+                "#38d6a0";
 
-                <td>${escapeHTML(incident.username || "—")}</td>
+            return `
+                <tr>
+                    <td><span class="incident-id">#${escapeHTML(incident.id)}</span></td>
+                    <td class="incident-title-cell">${escapeHTML(incident.title)}</td>
+                    <td>${escapeHTML(incident.host || "-")}</td>
+                    <td>${escapeHTML(incident.username || "-")}</td>
 
-                <td>${escapeHTML(incident.severity)}</td>
+                    <td>
+                        <span class="incident-severity ${severityClass}">
+                            ${escapeHTML(incident.severity)}
+                        </span>
+                    </td>
 
-                <td>${escapeHTML(incident.risk_score)}/100</td>
+                    <td>
+                        <div class="incident-risk">
+                            <div class="incident-risk-value">
+                                ${risk}<small>/100</small>
+                            </div>
+                            <div class="incident-risk-track">
+                                <div class="incident-risk-fill"
+                                     style="width:${risk}%; background:${riskColor};">
+                                </div>
+                            </div>
+                        </div>
+                    </td>
 
-                <td>
-                    <span class="badge-level">
-                        ${escapeHTML(incident.status)}
-                    </span>
-                </td>
+                    <td>
+                        <span class="incident-status ${statusClass}">
+                            ${escapeHTML(incident.status)}
+                        </span>
+                    </td>
 
-                <td>${escapeHTML(formatDate(incident.created_at))}</td>
+                    <td>${escapeHTML(formatDate(incident.created_at))}</td>
 
-                <td>
-                    <button
-                        class="refresh-btn"
-                        onclick="openIncidentDetails(${Number(incident.id)})">
-                        Manage
-                    </button>
-                </td>
-
-            </tr>
-
-        `).join("");
+                    <td>
+                        <button
+                            class="incident-manage-btn"
+                            onclick="openIncidentDetails(${Number(incident.id)})">
+                            Manage &rarr;
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join("");
 
     } catch (error) {
-
         body.innerHTML = `
             <tr>
-                <td colspan="9" class="empty">
-                    Unable to load incidents.
-                </td>
+                <td colspan="9" class="empty">Unable to load incidents.</td>
             </tr>
         `;
-
         console.error(error);
     }
 }
+
+// ==========================================
+// ==========================================
+// INCIDENT PAGINATION
+// ==========================================
+
+let incidentCurrentPage = 1;
+const incidentItemsPerPage = 10;
+
+function getFilteredIncidentRows() {
+
+    const search = (document.getElementById("incident-search")?.value || "")
+        .trim().toLowerCase();
+
+    const severity = (document.getElementById("incident-severity-filter")?.value || "")
+        .toLowerCase();
+
+    const status = (document.getElementById("incident-status-filter")?.value || "")
+        .toLowerCase();
+
+    return Array.from(document.querySelectorAll("#incidents-table tr")).filter(row => {
+
+        if (row.querySelector(".empty")) return false;
+
+        const text = row.textContent.toLowerCase();
+
+        const rowSeverity = row.querySelector(".incident-severity")
+            ?.textContent.trim().toLowerCase() || "";
+
+        const rowStatus = row.querySelector(".incident-status")
+            ?.textContent.trim().toLowerCase() || "";
+
+        return text.includes(search)
+            && (!severity || rowSeverity === severity)
+            && (!status || rowStatus === status);
+    });
+}
+
+function renderIncidentPagination(totalItems) {
+
+    const container = document.getElementById("incident-pagination");
+
+    if (!container) return;
+
+    const totalPages = Math.ceil(totalItems / incidentItemsPerPage);
+
+    if (totalPages <= 1) {
+        container.innerHTML = totalItems
+            ? `<span class="pagination-info">Showing ${totalItems} incidents</span>`
+            : "";
+        return;
+    }
+
+    let buttons = `
+        <button class="page-btn"
+            ${incidentCurrentPage === 1 ? "disabled" : ""}
+            onclick="changeIncidentPage(${incidentCurrentPage - 1})">
+            Previous
+        </button>
+    `;
+
+    for (let page = 1; page <= totalPages; page++) {
+        buttons += `
+            <button class="page-btn ${page === incidentCurrentPage ? "active" : ""}"
+                onclick="changeIncidentPage(${page})">
+                ${page}
+            </button>
+        `;
+    }
+
+    buttons += `
+        <button class="page-btn"
+            ${incidentCurrentPage === totalPages ? "disabled" : ""}
+            onclick="changeIncidentPage(${incidentCurrentPage + 1})">
+            Next
+        </button>
+    `;
+
+    container.innerHTML = `
+        <span class="pagination-info">
+            Page ${incidentCurrentPage} of ${totalPages} ط·آ¢ط¢آ· ${totalItems} incidents
+        </span>
+        <div class="pagination-buttons">${buttons}</div>
+    `;
+}
+
+function changeIncidentPage(page) {
+    incidentCurrentPage = page;
+    filterIncidents();
+}
+// INCIDENT SEARCH AND FILTERS
+// ==========================================
+
+function filterIncidents() {
+
+    const rows = Array.from(
+        document.querySelectorAll("#incidents-table tr")
+    );
+
+    const filteredRows = getFilteredIncidentRows();
+
+    const totalPages = Math.max(
+        1,
+        Math.ceil(filteredRows.length / incidentItemsPerPage)
+    );
+
+    incidentCurrentPage = Math.min(incidentCurrentPage, totalPages);
+
+    const startIndex = (incidentCurrentPage - 1) * incidentItemsPerPage;
+    const endIndex = startIndex + incidentItemsPerPage;
+
+    const visibleRows = new Set(
+        filteredRows.slice(startIndex, endIndex)
+    );
+
+    rows.forEach(row => {
+        row.style.display = visibleRows.has(row) ? "" : "none";
+    });
+
+    renderIncidentPagination(filteredRows.length);
+}
+ function setupIncidentFilters() {
+
+    const searchInput = document.getElementById("incident-search");
+    const severityFilter = document.getElementById("incident-severity-filter");
+    const statusFilter = document.getElementById("incident-status-filter");
+    const clearButton = document.getElementById("clear-incident-filters");
+
+    if (!searchInput || !severityFilter || !statusFilter || !clearButton) return;
+
+    searchInput.addEventListener("input", filterIncidents);
+    severityFilter.addEventListener("change", filterIncidents);
+    statusFilter.addEventListener("change", filterIncidents);
+
+    clearButton.addEventListener("click", () => {
+        searchInput.value = "";
+        severityFilter.value = "";
+        statusFilter.value = "";
+        filterIncidents();
+    });
+}
+
+document.addEventListener("DOMContentLoaded", setupIncidentFilters);
 
 
 // ==========================================
@@ -660,56 +830,72 @@ async function openIncidentDetails(id) {
             audit: auditData.audit || auditData.entries || auditData
         };
 
+        const severityClass = `severity-${String(incident.severity || "low").toLowerCase()}`;
+        const statusClass = `status-${String(incident.status || "open").toLowerCase().replace(/\s+/g, "-")}`;
+        const riskScore = Math.max(0, Math.min(100, Number(incident.risk_score) || 0));
+
         document.getElementById("incident-details-content").innerHTML = `
+            <div class="incident-overview">
 
-            <div class="row g-3">
+                <div class="incident-overview-header">
+                    <div>
+                        <span class="incident-section-label">INCIDENT OVERVIEW</span>
+                        <h2>${escapeHTML(incident.title || "Untitled Incident")}</h2>
+                        <span class="incident-reference">Incident #${escapeHTML(incident.id)}</span>
+                    </div>
 
-                <div class="col-md-6">
-                    <strong>Incident ID:</strong>
-                    #${escapeHTML(incident.id)}
+                    <div class="incident-overview-badges">
+                        <span class="incident-detail-badge ${severityClass}">
+                            ${escapeHTML(incident.severity || "Unknown")}
+                        </span>
+                        <span class="incident-detail-badge ${statusClass}">
+                            ${escapeHTML(incident.status || "Open")}
+                        </span>
+                    </div>
                 </div>
 
-                <div class="col-md-6">
-                    <strong>Title:</strong>
-                    ${escapeHTML(incident.title)}
+                <div class="incident-risk-card">
+                    <div class="incident-risk-heading">
+                        <span>Risk Score</span>
+                        <strong>${riskScore}<small>/100</small></strong>
+                    </div>
+                    <div class="incident-detail-risk-track">
+                        <div class="incident-detail-risk-fill" style="width:${riskScore}%"></div>
+                    </div>
+                    <div class="incident-risk-scale">
+                        <span>Low Risk</span>
+                        <span>High Risk</span>
+                    </div>
                 </div>
 
-                <div class="col-md-6">
-                    <strong>Host:</strong>
-                    ${escapeHTML(incident.host || "—")}
+                <div class="incident-metadata-grid">
+                    <div class="incident-metadata-card">
+                        <span>HOST</span>
+                        <strong>${escapeHTML(incident.host || "-")}</strong>
+                    </div>
+
+                    <div class="incident-metadata-card">
+                        <span>USERNAME</span>
+                        <strong>${escapeHTML(incident.username || "-")}</strong>
+                    </div>
+
+                    <div class="incident-metadata-card">
+                        <span>CREATED</span>
+                        <strong>${escapeHTML(formatDate(incident.created_at))}</strong>
+                    </div>
+
+                    <div class="incident-metadata-card">
+                        <span>INCIDENT ID</span>
+                        <strong>#${escapeHTML(incident.id)}</strong>
+                    </div>
                 </div>
 
-                <div class="col-md-6">
-                    <strong>Username:</strong>
-                    ${escapeHTML(incident.username || "—")}
+                <div class="incident-description-card">
+                    <span class="incident-section-label">DESCRIPTION</span>
+                    <p>${escapeHTML(incident.description || "No description provided.")}</p>
                 </div>
 
-                <div class="col-md-6">
-                    <strong>Severity:</strong>
-                    ${escapeHTML(incident.severity)}
-                </div>
-
-                <div class="col-md-6">
-                    <strong>Risk Score:</strong>
-                    ${escapeHTML(incident.risk_score)}/100
-                </div>
-
-                <div class="col-md-6">
-                    <strong>Status:</strong>
-                    ${escapeHTML(incident.status)}
-                </div>
-
-                <div class="col-md-6">
-                    <strong>Created:</strong>
-                    ${escapeHTML(formatDate(incident.created_at))}
-                </div>
-
-                <div class="col-12">
-                    <strong>Description:</strong>
-                    <p>${escapeHTML(incident.description || "No description")}</p>
-                </div>
-
-                <div class="col-12 mt-3">
+                <div class="incident-detail-actions">
                     <button type="button" class="refresh-btn"
                         onclick="requestIncidentLogCollection(${Number(incident.id)})">
                         Collect Security Logs
@@ -719,11 +905,10 @@ async function openIncidentDetails(id) {
                         onclick="generateIncidentReport()">
                         Generate PDF Report
                     </button>
-                    <div id="incident-response-message" class="mt-2"></div>
                 </div>
 
+                <div id="incident-response-message" class="mt-2"></div>
             </div>
-
         `;
 
         document.getElementById("incident-status").value =
@@ -773,9 +958,9 @@ function renderIncidentAudit(audit) {
 
             <td>${escapeHTML(entry.actor || "admin")}</td>
 
-            <td>${escapeHTML(entry.action || "—")}</td>
+            <td>${escapeHTML(entry.action || "-")}</td>
 
-            <td>${escapeHTML(entry.details || "—")}</td>
+            <td>${escapeHTML(entry.details || "-")}</td>
 
         </tr>
 
@@ -887,13 +1072,10 @@ setInterval(loadIncidents, 30000);
 // ==========================================
 
 async function loadResponseActions() {
-
     const table = document.getElementById("response-actions-table");
-
     if (!table) return;
 
     try {
-
         const response = await apiFetch("/api/response-actions");
         const data = await response.json();
 
@@ -904,95 +1086,156 @@ async function loadResponseActions() {
         const actions = data.actions || [];
         const stats = data.stats || {};
 
-        document.getElementById("response-total").textContent =
-            stats.total ?? 0;
-
-        document.getElementById("response-completed").textContent =
-            stats.completed ?? 0;
-
-        document.getElementById("response-failed").textContent =
-            stats.failed ?? 0;
-
-        document.getElementById("response-pending").textContent =
-            stats.pending ?? 0;
-
-        document.getElementById("response-events-collected").textContent =
-            stats.events_collected ?? 0;
+        document.getElementById("response-total").textContent = stats.total ?? 0;
+        document.getElementById("response-completed").textContent = stats.completed ?? 0;
+        document.getElementById("response-failed").textContent = stats.failed ?? 0;
+        document.getElementById("response-pending").textContent = stats.pending ?? 0;
+        document.getElementById("response-events-collected").textContent = stats.events_collected ?? 0;
 
         renderResponseChart(stats);
 
         if (!actions.length) {
             table.innerHTML = `
-                <tr><td colspan="8" class="empty">
-                    No response actions found.
-                </td></tr>`;
+                <tr>
+                    <td colspan="8" class="empty">
+                        No response actions found.
+                    </td>
+                </tr>`;
             return;
         }
 
         table.innerHTML = actions.map(action => {
-
             const result = action.result || {};
+            const id = Number(action.id);
+            const status = String(action.status || "unknown").toLowerCase();
+            const statusClass = status.replace(/[^a-z0-9_-]/g, "");
+            const dash = "-";
+
+            const host = result.host || result.hostname || "Unknown Host";
+            const summary = result.summary || "No summary available";
 
             return `
-                <tr>
-                    <td>#${Number(action.id)}</td>
+                <tr class="response-action-row">
+                    <td><strong>#${id}</strong></td>
+
                     <td>#${Number(action.incident_id)}</td>
-                    <td>${escapeHTML(action.action_type)}</td>
-                    <td><span class="response-status response-${String(action.status || "").toLowerCase()}">${escapeHTML(action.status)}</span></td>
-                    <td>${result.events_found ?? "—"}</td>
-                    <td>${result.events_uploaded ?? "—"}</td>
+
+                    <td>
+                        <span class="response-action-type">
+                            ${escapeHTML(action.action_type || "Unknown")}
+                        </span>
+                    </td>
+
+                    <td>
+                        <span class="response-status response-${statusClass}">
+                            ${escapeHTML(action.status || "Unknown")}
+                        </span>
+                    </td>
+
+                    <td>${escapeHTML(String(result.events_found ?? dash))}</td>
+
+                    <td>${escapeHTML(String(result.events_uploaded ?? dash))}</td>
+
                     <td>
                         <div class="response-result-details">
-                            <strong>${escapeHTML(result.host || result.hostname || "Unknown Host")}</strong>
-                            <div>${escapeHTML(result.summary || "No summary available")}</div>
-                            <small>Requested: ${result.requested_events ?? "—"} events</small>
+                            <strong>${escapeHTML(host)}</strong>
+                            <div>${escapeHTML(summary)}</div>
+                            <small>
+                                Requested: ${escapeHTML(String(result.requested_events ?? dash))} events
+                            </small>
                             <br>
-                            <small>Completed: ${escapeHTML(formatDate(action.completed_at) || "—")}</small>
+                            <small>
+                                Completed: ${escapeHTML(formatDate(action.completed_at) || dash)}
+                            </small>
                         </div>
                     </td>
+
                     <td>
-                        ${escapeHTML(formatDate(action.created_at))}
-                        <br>
+                        <div class="response-created-date">
+                            ${escapeHTML(formatDate(action.created_at) || dash)}
+                        </div>
+
                         <button type="button"
-                            class="btn-secondary"
-                            onclick="toggleResponseDetails(${Number(action.id)})">
+                            class="response-details-btn"
+                            onclick="toggleResponseDetails(${id})">
                             View Details
                         </button>
                     </td>
                 </tr>
-                <tr id="response-details-${Number(action.id)}" style="display:none;">
+
+                <tr id="response-details-${id}" class="response-expanded-row" style="display:none;">
                     <td colspan="8">
-                        <div class="response-result-details">
-                            <strong>Response Action #${Number(action.id)}</strong>
-                            <div>Host: ${escapeHTML(result.host || result.hostname || "Unknown")}</div>
-                            <small>Action: ${escapeHTML(action.action_type)}</small><br>
-                            <small>Status: ${escapeHTML(action.status)}</small><br>
-                            <small>Requested By: ${escapeHTML(action.requested_by || "—")}</small><br>
-                            <small>Events Found: ${result.events_found ?? "—"}</small><br>
-                            <small>Events Uploaded: ${result.events_uploaded ?? "—"}</small><br>
-                            <small>Summary: ${escapeHTML(result.summary || "—")}</small><br>
-                            <small>Created: ${escapeHTML(formatDate(action.created_at))}</small><br>
-                            <small>Completed: ${escapeHTML(formatDate(action.completed_at) || "—")}</small>
+                        <div class="response-expanded-content">
+                            <div class="response-expanded-header">
+                                <strong>Response Action #${id}</strong>
+                                <span class="response-status response-${statusClass}">
+                                    ${escapeHTML(action.status || "Unknown")}
+                                </span>
+                            </div>
+
+                            <div class="response-expanded-grid">
+                                <div>
+                                    <small>Host</small>
+                                    <strong>${escapeHTML(host)}</strong>
+                                </div>
+
+                                <div>
+                                    <small>Action Type</small>
+                                    <strong>${escapeHTML(action.action_type || dash)}</strong>
+                                </div>
+
+                                <div>
+                                    <small>Requested By</small>
+                                    <strong>${escapeHTML(action.requested_by || dash)}</strong>
+                                </div>
+
+                                <div>
+                                    <small>Events Requested</small>
+                                    <strong>${escapeHTML(String(result.requested_events ?? dash))}</strong>
+                                </div>
+
+                                <div>
+                                    <small>Events Found</small>
+                                    <strong>${escapeHTML(String(result.events_found ?? dash))}</strong>
+                                </div>
+
+                                <div>
+                                    <small>Events Uploaded</small>
+                                    <strong>${escapeHTML(String(result.events_uploaded ?? dash))}</strong>
+                                </div>
+
+                                <div>
+                                    <small>Created</small>
+                                    <strong>${escapeHTML(formatDate(action.created_at) || dash)}</strong>
+                                </div>
+
+                                <div>
+                                    <small>Completed</small>
+                                    <strong>${escapeHTML(formatDate(action.completed_at) || dash)}</strong>
+                                </div>
+                            </div>
+
+                            <div class="response-expanded-summary">
+                                <small>Execution Summary</small>
+                                <p>${escapeHTML(summary)}</p>
+                            </div>
                         </div>
                     </td>
                 </tr>
             `;
-
         }).join("");
 
     } catch (error) {
-
         console.error("Response Center:", error);
 
         table.innerHTML = `
-            <tr><td colspan="8" class="empty">
-                Failed to load response actions.
-            </td></tr>`;
+            <tr>
+                <td colspan="8" class="empty">
+                    Failed to load response actions.
+                </td>
+            </tr>`;
     }
 }
-
-
-// ==========================================
 // CREATE RESPONSE ACTION
 // ==========================================
 
@@ -1072,10 +1315,82 @@ document.getElementById("response-action-form")
 
 
 // ==========================================
+// LOAD INCIDENTS INTO RESPONSE CENTER DROPDOWN
+// ==========================================
+
+async function loadResponseIncidentOptions() {
+
+    const select = document.getElementById("response-incident-id");
+    const preview = document.getElementById("response-incident-preview");
+
+    if (!select) return;
+
+    try {
+        select.innerHTML = '<option value="">Loading incidents...</option>';
+
+        const response = await apiFetch("/api/incidents");
+
+        if (!response.ok) {
+            throw new Error("Could not load incidents");
+        }
+
+        const data = await response.json();
+
+        const incidents = Array.isArray(data)
+            ? data
+            : (data.incidents || []);
+
+        select.innerHTML = '<option value="">Select an incident...</option>';
+
+        if (!incidents.length) {
+            select.innerHTML = '<option value="">No incidents available</option>';
+            preview.textContent = "There are currently no incidents.";
+            return;
+        }
+
+        incidents.forEach(incident => {
+            const option = document.createElement("option");
+
+            option.value = incident.id;
+            option.textContent =
+                `#${incident.id} - ${incident.title || "Untitled"} - ${incident.host || "Unknown host"}`;
+
+            select.appendChild(option);
+        });
+
+        select.onchange = function () {
+            const incident = incidents.find(
+                item => String(item.id) === select.value
+            );
+
+            if (!incident) {
+                preview.textContent = "Select an incident to view its details.";
+                return;
+            }
+
+            preview.textContent =
+                `Host: ${incident.host || "Unknown"} | ` +
+                `User: ${incident.username || "Unknown"} | ` +
+                `Severity: ${incident.severity || "Unknown"} | ` +
+                `Status: ${incident.status || "Unknown"}`;
+        };
+
+        preview.textContent = "Select an incident to view its details.";
+
+    } catch (error) {
+        select.innerHTML = '<option value="">Failed to load incidents</option>';
+        preview.textContent = error.message;
+        console.error("Incident dropdown error:", error);
+    }
+}
+
+
+// ==========================================
 // RESPONSE CENTER INITIALIZATION
 // ==========================================
 
 loadResponseActions();
+loadResponseIncidentOptions();
 
 setInterval(loadResponseActions, 10000);
 
@@ -1305,7 +1620,7 @@ async function generateIncidentReport() {
         const actions = responseData.actions || [];
 
         const field = (value) =>
-            escapeHTML(value ?? "�");
+            escapeHTML(value ?? "-");
 
         const auditRows = audit.map(entry => `
             <tr>
@@ -1538,3 +1853,24 @@ async function generateIncidentReport() {
     }
 }
 
+
+/* Incident Risk Score Live Update */
+
+const incidentRiskInput = document.getElementById("incident-risk");
+const incidentRiskValue = document.getElementById("risk-value");
+
+if (incidentRiskInput && incidentRiskValue) {
+    const updateIncidentRisk = () => {
+        const score = Number(incidentRiskInput.value);
+
+        incidentRiskValue.textContent = score;
+
+        incidentRiskValue.style.color =
+            score >= 75 ? "#ff536b" :
+            score >= 40 ? "#f2cb60" :
+            "#38d6a0";
+    };
+
+    incidentRiskInput.addEventListener("input", updateIncidentRisk);
+    updateIncidentRisk();
+}

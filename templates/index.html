@@ -11,15 +11,15 @@
 <body>
 <div class="layout">
     <aside class="sidebar">
-        <div class="brand"><span class="brand-icon">◈</span> InsiderWatch</div>
+        <div class="brand"><span class="brand-icon">&#9672;</span> InsiderWatch</div>
 
         <div class="nav-label">MAIN MENU</div>
 
-        <a class="nav-item active" href="/">▦ &nbsp; Dashboard</a>
-        <a class="nav-item" href="#threats">◉ &nbsp; Threat Detection</a>
-        <a class="nav-item" href="#events">▤ &nbsp; Security Events</a>
-        <a class="nav-item" href="#incidents">⚑ &nbsp; Incident Management</a>
-        <a class="nav-item" href="#response-center">⚡ &nbsp; Response Center</a>
+        <a class="nav-item active" href="/">&#9632;&nbsp; Dashboard</a>
+        <a class="nav-item" href="#threats">&#9673;&nbsp; Threat Detection</a>
+        <a class="nav-item" href="#events">&#9638;&nbsp; Security Events</a>
+        <a class="nav-item" href="#incidents">&#128737;&nbsp; Incident Management</a>
+        <a class="nav-item" href="#response-center">&#9889;&nbsp; Response Center</a>
 
         <div class="sidebar-bottom">
             <div class="system-status"><span class="pulse"></span> System Online</div>
@@ -37,7 +37,7 @@
 
             <div class="top-right">
                 <span class="live"><span class="pulse"></span> LIVE MONITORING</span>
-                <button class="refresh-btn" onclick="loadDashboard()">↻ Refresh</button>
+                <button class="refresh-btn" onclick="loadDashboard()">&#8635; Refresh</button>
             </div>
         </header>
 
@@ -51,36 +51,36 @@
             <div class="stat-card">
                 <div class="stat-top">
                     <span>Total Events</span>
-                    <span class="stat-icon blue">▤</span>
+                    <span class="stat-icon blue">&#9638;</span>
                 </div>
-                <div class="stat-value" id="total-events">—</div>
+                <div class="stat-value" id="total-events">&#8212;</div>
                 <div class="stat-note">Collected security events</div>
             </div>
 
             <div class="stat-card">
                 <div class="stat-top">
                     <span>Failed Logins</span>
-                    <span class="stat-icon red">⚠</span>
+                    <span class="stat-icon red">&#9888;</span>
                 </div>
-                <div class="stat-value" id="failed-logins">—</div>
+                <div class="stat-value" id="failed-logins">&#8212;</div>
                 <div class="stat-note">Failed authentication attempts</div>
             </div>
 
             <div class="stat-card">
                 <div class="stat-top">
                     <span>AI Anomalies</span>
-                    <span class="stat-icon purple">◉</span>
+                    <span class="stat-icon purple">&#9673;</span>
                 </div>
-                <div class="stat-value" id="anomalies">—</div>
+                <div class="stat-value" id="anomalies">&#8212;</div>
                 <div class="stat-note">Unusual behavior detected</div>
             </div>
 
             <div class="stat-card">
                 <div class="stat-top">
                     <span>Profiles Analyzed</span>
-                    <span class="stat-icon green">♙</span>
+                    <span class="stat-icon green">&#9733;</span>
                 </div>
-                <div class="stat-value" id="profiles">—</div>
+                <div class="stat-value" id="profiles">&#8212;</div>
                 <div class="stat-note">User and host profiles</div>
             </div>
         </section>
@@ -241,7 +241,7 @@
                 </div>
 
                 <button class="refresh-btn" onclick="loadIncidents()">
-                    ↻ Refresh Incidents
+                    &#8635; Refresh Incidents
                 </button>
             </div>
 
@@ -270,16 +270,32 @@
                             </select>
                         </div>
 
+                        <!-- UPDATED RISK SCORE SLIDER -->
                         <div class="col-md-3">
                             <label class="form-label">Risk Score</label>
-                            <input type="number"
-                                   class="form-control"
-                                   id="incident-risk"
-                                   min="0"
-                                   max="100"
-                                   value="50"
-                                   required>
+
+                            <div class="risk-slider-container">
+                                <div class="risk-value">
+                                    <span id="risk-value">50</span>
+                                    <small>/ 100</small>
+                                </div>
+
+                                <input type="range"
+                                       class="form-range"
+                                       id="incident-risk"
+                                       min="0"
+                                       max="100"
+                                       value="50"
+                                       required>
+
+                                <div class="risk-labels">
+                                    <span>Low</span>
+                                    <span>Medium</span>
+                                    <span>High</span>
+                                </div>
+                            </div>
                         </div>
+                        <!-- END UPDATED RISK SCORE SLIDER -->
 
                         <div class="col-md-6">
                             <label class="form-label">Host</label>
@@ -322,6 +338,34 @@
             <div class="p-3">
                 <h4>Security Incidents</h4>
 
+                <div class="incident-filters">
+                    <input
+                        type="text"
+                        id="incident-search"
+                        placeholder="Search by ID, title, host or username..."
+                        class="incident-search-input">
+
+                    <select id="incident-severity-filter" class="incident-filter-select">
+                        <option value="">All Severities</option>
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                        <option value="critical">Critical</option>
+                    </select>
+
+                    <select id="incident-status-filter" class="incident-filter-select">
+                        <option value="">All Statuses</option>
+                        <option value="open">Open</option>
+                        <option value="investigating">Investigating</option>
+                        <option value="resolved">Resolved</option>
+                        <option value="closed">Closed</option>
+                    </select>
+
+                    <button type="button" id="clear-incident-filters" class="incident-clear-btn">
+                        Clear
+                    </button>
+                </div>
+
                 <div class="table-responsive">
                     <table>
                         <thead>
@@ -345,6 +389,9 @@
                         </tbody>
                     </table>
                 </div>
+
+                <div id="incident-pagination" class="incident-pagination"></div>
+
             </div>
         </section>
 
@@ -450,7 +497,7 @@
                 </div>
 
                 <button class="refresh-btn" onclick="loadResponseActions()">
-                    ↻ Refresh
+                    &#8635; Refresh
                 </button>
             </div>
 
@@ -505,12 +552,12 @@
                     <div class="mb-3">
                         <label class="form-label">Incident ID</label>
 
-                        <input type="number"
-                               id="response-incident-id"
-                               class="form-control"
-                               min="1"
-                               placeholder="Enter Incident ID"
-                               required>
+                        <select id="response-incident-id" class="form-control" required>
+    <option value="">Loading incidents...</option>
+</select>
+<small id="response-incident-preview" class="form-text">
+    Select an incident to view its details.
+</small>
                     </div>
 
                     <div class="mb-3">
@@ -526,7 +573,7 @@
                     </div>
 
                     <button type="submit" class="refresh-btn">
-                        ⚡ Request Log Collection
+                        Request Log Collection
                     </button>
 
                     <span id="response-message" class="ms-2"></span>
